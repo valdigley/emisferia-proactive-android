@@ -57,13 +57,6 @@
                 android:value="Voice assistant background monitoring" />
         </service>
 
-        <!-- Voice Recognition Service -->
-        <service
-            android:name=".service.VoiceRecognitionService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="microphone" />
-
         <!-- Boot receiver to restart service -->
         <receiver
             android:name=".service.BootReceiver"

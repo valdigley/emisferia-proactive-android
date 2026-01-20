@@ -31,7 +31,9 @@ data class MainUiState(
     val isConnected: Boolean = true,
     val isServiceRunning: Boolean = false,
     val currentText: String = "",
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val updateInfo: UpdateChecker.UpdateInfo? = null,
+    val showUpdateDialog: Boolean = false
 )
 
 /**
@@ -65,6 +67,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         observeTtsState()
         observeServiceState()
         checkConnection()
+        checkForUpdates()
     }
 
     private fun initializeServices() {
@@ -130,6 +133,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Log.e(TAG, "Connection failed: ${error.message}")
             }
         }
+    }
+
+    /**
+     * Check for app updates from GitHub
+     */
+    private fun checkForUpdates() {
+        viewModelScope.launch {
+            try {
+                val updateInfo = UpdateChecker.checkForUpdate()
+                if (updateInfo != null && updateInfo.hasUpdate) {
+                    Log.d(TAG, "Update available: ${updateInfo.latestVersion}")
+                    _uiState.update { it.copy(updateInfo = updateInfo, showUpdateDialog = true) }
+                } else {
+                    Log.d(TAG, "No update available")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to check for updates: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Dismiss update dialog
+     */
+    fun dismissUpdateDialog() {
+        _uiState.update { it.copy(showUpdateDialog = false) }
+    }
+
+    /**
+     * Open download page for update
+     */
+    fun downloadUpdate() {
+        _uiState.value.updateInfo?.let { info ->
+            if (info.downloadUrl.isNotEmpty()) {
+                UpdateChecker.openDownloadPage(getApplication(), info.downloadUrl)
+            }
+        }
+        dismissUpdateDialog()
     }
 
     /**

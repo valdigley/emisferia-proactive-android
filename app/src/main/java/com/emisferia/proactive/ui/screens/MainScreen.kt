@@ -24,6 +24,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.emisferia.proactive.ui.components.*
 import com.emisferia.proactive.ui.theme.*
 import com.emisferia.proactive.viewmodel.*
+import com.emisferia.proactive.service.UpdateChecker
 import kotlinx.coroutines.delay
 
 /**
@@ -172,6 +173,15 @@ fun MainScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // Update Dialog
+        if (uiState.showUpdateDialog && uiState.updateInfo != null) {
+            UpdateDialog(
+                updateInfo = uiState.updateInfo!!,
+                onDismiss = { viewModel.dismissUpdateDialog() },
+                onUpdate = { viewModel.downloadUpdate() }
+            )
         }
     }
 }
@@ -346,5 +356,71 @@ private fun LiveTranscription(
         color = NeonGreen.copy(alpha = 0.5f),
         textAlign = TextAlign.Center,
         modifier = modifier
+    )
+}
+
+/**
+ * Update available dialog
+ */
+@Composable
+private fun UpdateDialog(
+    updateInfo: UpdateChecker.UpdateInfo,
+    onDismiss: () -> Unit,
+    onUpdate: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DarkSurface,
+        titleContentColor = TextPrimary,
+        textContentColor = TextSecondary,
+        title = {
+            Text(
+                text = "Atualização Disponível",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Nova versão ${updateInfo.latestVersion} disponível!",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Versão atual: ${updateInfo.currentVersion}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                if (updateInfo.releaseNotes.isNotEmpty()) {
+                    Text(
+                        text = updateInfo.releaseNotes.take(200) +
+                            if (updateInfo.releaseNotes.length > 200) "..." else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onUpdate,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = NeonCyan
+                )
+            ) {
+                Text("Atualizar")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = TextSecondary
+                )
+            ) {
+                Text("Depois")
+            }
+        }
     )
 }
