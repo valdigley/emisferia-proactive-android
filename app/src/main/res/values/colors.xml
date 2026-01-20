@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Neon Colors -->
+    <color name="neon_cyan">#00FFFF</color>
+    <color name="neon_cyan_dark">#00B8B8</color>
+    <color name="neon_purple">#9D00FF</color>
+    <color name="neon_purple_dark">#7000B8</color>
+    <color name="neon_pink">#FF00FF</color>
+    <color name="neon_green">#00FF66</color>
+    <color name="neon_blue">#0066FF</color>
+
+    <!-- Background Colors -->
+    <color name="dark_background">#0A0A0F</color>
+    <color name="dark_surface">#12121A</color>
+    <color name="dark_surface_variant">#1A1A24</color>
+    <color name="dark_card">#15151F</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#E0E0E0</color>
+    <color name="text_secondary">#A0A0A0</color>
+    <color name="text_muted">#606060</color>
+
+    <!-- Status Colors -->
+    <color name="status_success">#00FF66</color>
+    <color name="status_error">#FF4444</color>
+    <color name="status_warning">#FFAA00</color>
+    <color name="status_info">#00FFFF</color>
+
+    <!-- Transparency -->
+    <color name="transparent">#00000000</color>
+</resources>

@@ -1,0 +1,7 @@
+# Local configuration - copy to local.properties and adjust
+
+# Android SDK location (required)
+# sdk.dir=/path/to/android/sdk
+
+# EmisferIA API URL (optional - override default)
+# EMISFERIA_API_URL=https://your-server.com/api

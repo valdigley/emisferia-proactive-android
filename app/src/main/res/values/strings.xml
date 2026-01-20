@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EmisferIA</string>
+
+    <!-- Voice -->
+    <string name="listening">Ouvindo...</string>
+    <string name="speaking">Falando</string>
+    <string name="processing">Processando...</string>
+    <string name="tap_to_speak">Toque para falar</string>
+
+    <!-- Actions -->
+    <string name="tasks">Tarefas</string>
+    <string name="schedule">Agenda</string>
+    <string name="financial">Financeiro</string>
+    <string name="messages">Mensagens</string>
+    <string name="deals">Negocios</string>
+    <string name="refresh">Atualizar</string>
+
+    <!-- Status -->
+    <string name="connected">Conectado</string>
+    <string name="disconnected">Desconectado</string>
+    <string name="no_pending_tasks">Nenhuma tarefa pendente</string>
+    <string name="no_schedule_today">Nenhum compromisso hoje</string>
+
+    <!-- Financial -->
+    <string name="receivable">A Receber</string>
+    <string name="payable">A Pagar</string>
+    <string name="overdue">Vencido</string>
+    <string name="balance">Saldo</string>
+
+    <!-- Permissions -->
+    <string name="permission_microphone_title">Permissao de Microfone</string>
+    <string name="permission_microphone_message">O EmisferIA precisa acessar o microfone para reconhecimento de voz.</string>
+
+    <!-- Errors -->
+    <string name="error_voice_not_available">Reconhecimento de voz nao disponivel</string>
+    <string name="error_network">Erro de conexao. Verifique sua internet.</string>
+    <string name="error_processing">Erro ao processar comando.</string>
+</resources>
