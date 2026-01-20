@@ -11,16 +11,16 @@ android {
         applicationId = "com.emisferia.proactive"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
 
-        // API URL - configure in local.properties
-        buildConfigField("String", "API_URL", "\"${project.findProperty("EMISFERIA_API_URL") ?: "https://emisfera.valdigley.com/api"}\"")
+        // API URL - configure in local.properties or use default
+        buildConfigField("String", "API_URL", "\"${project.findProperty("EMISFERIA_API_URL") ?: "https://emisferia3.valdigley.com/api"}\"")
     }
 
     buildTypes {
@@ -30,6 +30,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            isDebuggable = true
         }
     }
 
@@ -76,6 +79,7 @@ dependencies {
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-service:2.6.2")
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.5")
@@ -91,6 +95,9 @@ dependencies {
 
     // DataStore for preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    // Work Manager for background tasks
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
