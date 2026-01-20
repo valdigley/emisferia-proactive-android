@@ -48,8 +48,31 @@ fun MainScreen(
         }
     }
 
-    // Auto-listening disabled for debugging - tap on neural wave to start
-    var hasStartedListening by remember { mutableStateOf(false) }
+    // Auto-listening enabled - continuous voice interaction
+    var autoListenEnabled by remember { mutableStateOf(false) }
+
+    // Continuous listening mode - always listening when not speaking
+    LaunchedEffect(uiState.isListening, uiState.isSpeaking, uiState.isProcessing, autoListenEnabled) {
+        if (autoListenEnabled && !uiState.isListening && !uiState.isSpeaking && !uiState.isProcessing) {
+            delay(2000) // Pause before restarting listening
+            try {
+                viewModel.startListening()
+            } catch (e: Exception) {
+                // Ignore errors
+            }
+        }
+    }
+
+    // Start listening after app initializes
+    LaunchedEffect(Unit) {
+        delay(3000) // Wait for everything to initialize
+        autoListenEnabled = true
+        try {
+            viewModel.startListening()
+        } catch (e: Exception) {
+            // Ignore errors
+        }
+    }
 
     Box(
         modifier = Modifier

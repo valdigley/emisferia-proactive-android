@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.emisferia.proactive.api.*
 import com.emisferia.proactive.service.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -66,7 +67,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             initializeServices()
             observeVoiceState()
             observeTtsState()
-            // observeServiceState() // Disabled until service is re-enabled
+            observeServiceState()
             checkConnection()
             checkForUpdates()
         } catch (e: Exception) {
@@ -84,8 +85,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 processCommand(command)
             }
 
-            // Note: Foreground service disabled for now - can be enabled later
-            // EmisferiaForegroundService.start(getApplication())
+            // Start foreground service with delay for proactive features
+            viewModelScope.launch {
+                delay(2000) // Wait for app to fully initialize
+                try {
+                    EmisferiaForegroundService.start(getApplication())
+                    Log.d(TAG, "Foreground service started")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start foreground service: ${e.message}")
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing services: ${e.message}")
         }
