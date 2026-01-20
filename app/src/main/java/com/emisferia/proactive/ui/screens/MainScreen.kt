@@ -48,31 +48,8 @@ fun MainScreen(
         }
     }
 
-    // Track if we should auto-listen
-    var autoListenEnabled by remember { mutableStateOf(false) }
-
-    // Continuous listening mode - always listening when not speaking
-    LaunchedEffect(uiState.isListening, uiState.isSpeaking, uiState.isProcessing, autoListenEnabled) {
-        if (autoListenEnabled && !uiState.isListening && !uiState.isSpeaking && !uiState.isProcessing) {
-            delay(2000) // Pause before restarting listening
-            try {
-                viewModel.startListening()
-            } catch (e: Exception) {
-                // Ignore errors
-            }
-        }
-    }
-
-    // Start listening on launch with longer delay
-    LaunchedEffect(Unit) {
-        delay(3000) // Wait for everything to initialize
-        autoListenEnabled = true
-        try {
-            viewModel.startListening()
-        } catch (e: Exception) {
-            // Ignore errors
-        }
-    }
+    // Auto-listening disabled for debugging - tap on neural wave to start
+    var hasStartedListening by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -147,11 +124,20 @@ fun MainScreen(
                 }
             }
 
-            // Central Neural Wave
+            // Central Neural Wave - tap to start listening
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(300.dp),
+                    .height(300.dp)
+                    .clickable {
+                        if (!uiState.isListening && !uiState.isSpeaking) {
+                            try {
+                                viewModel.startListening()
+                            } catch (e: Exception) {
+                                // Ignore
+                            }
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 NeuralWaveView(

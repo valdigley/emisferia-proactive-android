@@ -17,6 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.emisferia.proactive.ui.screens.MainScreen
+import com.emisferia.proactive.ui.theme.DarkBackground
+import com.emisferia.proactive.ui.theme.EmisferiaProactiveTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -44,11 +47,22 @@ class MainActivity : ComponentActivity() {
             checkAndRequestPermissions()
 
             setContent {
-                SimpleTestScreen()
+                EmisferiaProactiveTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = DarkBackground
+                    ) {
+                        MainScreen()
+                    }
+                }
             }
             Log.d(TAG, "setContent completed")
         } catch (e: Exception) {
             Log.e(TAG, "Error in onCreate: ${e.message}", e)
+            // Show error screen
+            setContent {
+                ErrorScreen(e.message ?: "Unknown error")
+            }
         }
     }
 
@@ -64,7 +78,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun SimpleTestScreen() {
+fun ErrorScreen(message: String) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -76,19 +90,14 @@ fun SimpleTestScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "EmisferIA",
-                color = Color(0xFF00FFFF),
-                fontSize = 32.sp
+                text = "Erro ao iniciar",
+                color = Color.Red,
+                fontSize = 24.sp
             )
             Text(
-                text = "App iniciado com sucesso!",
+                text = message,
                 color = Color.White,
-                fontSize = 16.sp
-            )
-            Text(
-                text = "v${BuildConfig.VERSION_NAME}",
-                color = Color.Gray,
-                fontSize = 12.sp
+                fontSize = 14.sp
             )
         }
     }
