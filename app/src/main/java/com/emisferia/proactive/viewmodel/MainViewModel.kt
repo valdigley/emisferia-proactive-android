@@ -62,25 +62,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val conversationHistory: StateFlow<List<ConversationMessage>> = _conversationHistory.asStateFlow()
 
     init {
-        initializeServices()
-        observeVoiceState()
-        observeTtsState()
-        observeServiceState()
-        checkConnection()
-        checkForUpdates()
+        try {
+            initializeServices()
+            observeVoiceState()
+            observeTtsState()
+            // observeServiceState() // Disabled until service is re-enabled
+            checkConnection()
+            checkForUpdates()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in ViewModel init: ${e.message}")
+        }
     }
 
     private fun initializeServices() {
-        voiceService.initialize()
-        ttsService.initialize()
+        try {
+            voiceService.initialize()
+            ttsService.initialize()
 
-        // Set up voice command callback
-        voiceService.onCommandRecognized = { command ->
-            processCommand(command)
+            // Set up voice command callback
+            voiceService.onCommandRecognized = { command ->
+                processCommand(command)
+            }
+
+            // Note: Foreground service disabled for now - can be enabled later
+            // EmisferiaForegroundService.start(getApplication())
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing services: ${e.message}")
         }
-
-        // Start the background service
-        EmisferiaForegroundService.start(getApplication())
     }
 
     private fun observeVoiceState() {
