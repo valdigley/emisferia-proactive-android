@@ -39,12 +39,9 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val allGranted = permissions.values.all { it }
-        if (allGranted) {
-            // Start wake word service after permissions granted
-            startWakeWordService()
-        }
+    ) { _ ->
+        // Permissions granted - app ready to use
+        // Wake word service disabled (see checkAndRequestPermissions)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,10 +84,10 @@ class MainActivity : ComponentActivity() {
 
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
-        } else {
-            // All permissions granted, start wake word service
-            startWakeWordService()
         }
+        // Note: Wake word service disabled - Android's SpeechRecognizer
+        // is not suitable for always-on listening (causes beeps).
+        // For proper wake word, we need Porcupine or similar offline library.
     }
 
     private fun startWakeWordService() {
