@@ -8,18 +8,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.emisferia.proactive.ui.screens.MainScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.emisferia.proactive.ui.components.NeuralWaveView
 import com.emisferia.proactive.ui.theme.DarkBackground
-import com.emisferia.proactive.ui.theme.EmisferiaProactiveTheme
+import com.emisferia.proactive.ui.theme.NeonCyan
+import com.emisferia.proactive.ui.theme.TextPrimary
+import com.emisferia.proactive.ui.theme.TextSecondary
+import com.emisferia.proactive.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -42,28 +48,20 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate started")
 
-        try {
-            // Check and request permissions
-            checkAndRequestPermissions()
+        // Request permissions first
+        checkAndRequestPermissions()
 
-            setContent {
-                EmisferiaProactiveTheme {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = DarkBackground
-                    ) {
-                        MainScreen()
-                    }
-                }
-            }
-            Log.d(TAG, "setContent completed")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in onCreate: ${e.message}", e)
-            // Show error screen
-            setContent {
-                ErrorScreen(e.message ?: "Unknown error")
+        setContent {
+            // Simple dark background without theme to isolate issues
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0A0A0F))
+            ) {
+                SimpleProactiveScreen()
             }
         }
+        Log.d(TAG, "setContent completed")
     }
 
     private fun checkAndRequestPermissions() {
@@ -73,6 +71,77 @@ class MainActivity : ComponentActivity() {
 
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
+        }
+    }
+}
+
+/**
+ * Simple proactive screen - minimal version to test stability
+ */
+@Composable
+fun SimpleProactiveScreen() {
+    val viewModel: MainViewModel = viewModel()
+    val uiState by viewModel.uiState.collectAsState()
+    val audioLevel by viewModel.audioLevel.collectAsState()
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Spacer(modifier = Modifier.height(60.dp))
+
+            // Title
+            Text(
+                text = "EmisferIA",
+                color = Color(0xFF00FFFF),
+                fontSize = 32.sp
+            )
+
+            Text(
+                text = "Proactive",
+                color = Color(0xFF9D00FF),
+                fontSize = 18.sp
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Neural wave visualization
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clickable {
+                        if (!uiState.isListening && !uiState.isSpeaking) {
+                            viewModel.startListening()
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                NeuralWaveView(
+                    modifier = Modifier.size(300.dp),
+                    isListening = uiState.isListening,
+                    isSpeaking = uiState.isSpeaking,
+                    audioAmplitude = audioLevel
+                )
+            }
+
+            // Status text
+            Text(
+                text = when {
+                    uiState.isSpeaking -> "Falando..."
+                    uiState.isListening -> "Ouvindo..."
+                    uiState.isProcessing -> "Processando..."
+                    else -> "Toque para falar"
+                },
+                color = Color(0xFF00FFFF),
+                fontSize = 16.sp
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
