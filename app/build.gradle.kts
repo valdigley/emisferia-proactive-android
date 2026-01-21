@@ -12,8 +12,8 @@ android {
         applicationId = "com.emisferia.proactive"
         minSdk = 26
         targetSdk = 34
-        versionCode = 26
-        versionName = "1.6.7"
+        versionCode = 27
+        versionName = "1.6.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -22,6 +22,9 @@ android {
 
         // API URL - configure in local.properties or use default
         buildConfigField("String", "API_URL", "\"${project.findProperty("EMISFERIA_API_URL") ?: "https://emisferia3.valdigley.com/api"}\"")
+
+        // Porcupine Access Key - get from https://console.picovoice.ai/
+        buildConfigField("String", "PORCUPINE_ACCESS_KEY", "\"${project.findProperty("PORCUPINE_ACCESS_KEY") ?: ""}\"")
     }
 
     buildTypes {
@@ -104,6 +107,9 @@ dependencies {
     // Firebase Cloud Messaging
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-messaging-ktx")
+
+    // Porcupine Wake Word Detection (offline, low-power)
+    implementation("ai.picovoice:porcupine-android:3.0.2")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

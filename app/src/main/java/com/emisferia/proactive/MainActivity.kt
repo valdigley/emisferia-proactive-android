@@ -13,7 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import com.emisferia.proactive.service.WakeWordService
+import com.emisferia.proactive.service.PorcupineWakeWordService
 import com.emisferia.proactive.ui.screens.MainScreen
 import com.emisferia.proactive.ui.theme.DarkBackground
 import com.emisferia.proactive.ui.theme.EmisferiaProactiveTheme
@@ -39,9 +39,12 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ ->
-        // Permissions granted - app ready to use
-        // Wake word service disabled (see checkAndRequestPermissions)
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
+            // Start Porcupine wake word service if configured
+            startPorcupineWakeWordService()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,15 +87,26 @@ class MainActivity : ComponentActivity() {
 
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
+        } else {
+            // All permissions already granted, start wake word service
+            startPorcupineWakeWordService()
         }
-        // Note: Wake word service disabled - Android's SpeechRecognizer
-        // is not suitable for always-on listening (causes beeps).
-        // For proper wake word, we need Porcupine or similar offline library.
     }
 
-    private fun startWakeWordService() {
-        if (!WakeWordService.isRunning) {
-            val serviceIntent = Intent(this, WakeWordService::class.java)
+    /**
+     * Start Porcupine wake word service (offline, no beeps)
+     * Requires PORCUPINE_ACCESS_KEY to be configured
+     */
+    private fun startPorcupineWakeWordService() {
+        // Only start if access key is configured
+        if (BuildConfig.PORCUPINE_ACCESS_KEY.isBlank()) {
+            android.util.Log.w("MainActivity", "Porcupine access key not configured - wake word disabled")
+            android.util.Log.w("MainActivity", "Get your free key at https://console.picovoice.ai/")
+            return
+        }
+
+        if (!PorcupineWakeWordService.isRunning) {
+            val serviceIntent = Intent(this, PorcupineWakeWordService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent)
             } else {
@@ -102,7 +116,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun stopWakeWordService() {
-        val serviceIntent = Intent(this, WakeWordService::class.java)
+        val serviceIntent = Intent(this, PorcupineWakeWordService::class.java)
         stopService(serviceIntent)
     }
 }

@@ -50,9 +50,15 @@
             </intent-filter>
         </service>
 
-        <!-- Wake Word Service (listens for "Assistente") -->
+        <!-- Wake Word Service - Old (SpeechRecognizer, disabled) -->
         <service
             android:name=".service.WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- Wake Word Service - Porcupine (offline, no beeps) -->
+        <service
+            android:name=".service.PorcupineWakeWordService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
