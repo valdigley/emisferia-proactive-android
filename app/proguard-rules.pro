@@ -41,3 +41,14 @@
 
 # Keep Speech Recognition
 -keep class android.speech.** { *; }
+
+# Porcupine / Picovoice Wake Word
+-keep class ai.picovoice.** { *; }
+-keep class ai.picovoice.porcupine.** { *; }
+-keepclassmembers class ai.picovoice.** { *; }
+-dontwarn ai.picovoice.**
+
+# Keep native methods
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
