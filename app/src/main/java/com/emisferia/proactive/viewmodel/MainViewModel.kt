@@ -1,12 +1,11 @@
 package com.emisferia.proactive.viewmodel
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.emisferia.proactive.MainActivity
 import com.emisferia.proactive.api.*
 import com.emisferia.proactive.service.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -30,40 +29,23 @@ data class MainUiState(
     val isSpeaking: Boolean = false,
     val isProcessing: Boolean = false,
     val isConnected: Boolean = true,
-    val isServiceRunning: Boolean = false,
     val currentText: String = "",
     val errorMessage: String? = null,
-    val updateInfo: UpdateChecker.UpdateInfo? = null,
-    val showUpdateDialog: Boolean = false
+    val autoListenEnabled: Boolean = true  // Auto-listen after AI speaks
 )
 
 /**
  * Main ViewModel
- * Manages voice interaction with EmisferIA AI
- * Uses AI Chat for full system access
+ * Manages voice interaction in real-time with EmisferIA
+ * No buttons, no menus - pure voice interface
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    companion object {
-        private const val TAG = "MainViewModel"
-    }
+    private val repository = EmisferiaRepository()
 
-    // Repository - lazy initialization
-    private val repository: EmisferiaRepository by lazy {
-        Log.d(TAG, "Creating EmisferiaRepository")
-        EmisferiaRepository()
-    }
-
-    // Services - lazy initialization for safety
-    val voiceService: VoiceRecognitionService by lazy {
-        Log.d(TAG, "Creating VoiceRecognitionService")
-        VoiceRecognitionService(getApplication())
-    }
-
-    private val ttsService: TextToSpeechService by lazy {
-        Log.d(TAG, "Creating TextToSpeechService")
-        TextToSpeechService(getApplication())
-    }
+    // Services
+    val voiceService = VoiceRecognitionService(application)
+    private val ttsService = TextToSpeechService(application)
 
     // UI State
     private val _uiState = MutableStateFlow(MainUiState())
@@ -73,70 +55,73 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _conversationHistory = MutableStateFlow<List<ConversationMessage>>(emptyList())
     val conversationHistory: StateFlow<List<ConversationMessage>> = _conversationHistory.asStateFlow()
 
-    // Audio level for visualization
-    private val _audioLevel = MutableStateFlow(0f)
-    val audioLevel: StateFlow<Float> = _audioLevel.asStateFlow()
+    // Data states (cached for voice responses)
+    private val _dashboard = MutableStateFlow<DashboardData?>(null)
+    private val _tasks = MutableStateFlow<List<Task>>(emptyList())
+    private val _schedule = MutableStateFlow<List<Schedule>>(emptyList())
+    private val _financialSummary = MutableStateFlow<FinancialSummary?>(null)
 
     init {
-        Log.d(TAG, "ViewModel init started - v1.3.4")
-        viewModelScope.launch {
-            try {
-                delay(500) // Small delay to let the UI settle
-                Log.d(TAG, "Starting service initialization...")
-                initializeServices()
-                Log.d(TAG, "Services initialized, starting observers...")
-                observeVoiceState()
-                observeTtsState()
-                Log.d(TAG, "Observers started, checking connection...")
-                checkConnection()
-                Log.d(TAG, "Checking for updates...")
-                checkForUpdates()
-                Log.d(TAG, "ViewModel init completed successfully")
-            } catch (e: Exception) {
-                Log.e(TAG, "FATAL Error in ViewModel init: ${e.message}", e)
-                _uiState.update { it.copy(errorMessage = "Init error: ${e.message}") }
-            }
-        }
+        initializeServices()
+        loadInitialData()
+        observeVoiceState()
+        observeTtsState()
     }
 
     private fun initializeServices() {
-        Log.d(TAG, "Step 1: Creating VoiceRecognitionService...")
-        try {
-            voiceService.initialize()
-            Log.d(TAG, "Step 1: VoiceRecognitionService initialized")
-        } catch (e: Exception) {
-            Log.e(TAG, "Step 1 FAILED: VoiceRecognitionService error: ${e.message}", e)
-            _uiState.update { it.copy(errorMessage = "Voice service error: ${e.message}") }
-            return
+        voiceService.initialize()
+        ttsService.initialize()
+
+        // Set up voice command callback
+        voiceService.onCommandRecognized = { command ->
+            processCommand(command)
         }
 
-        Log.d(TAG, "Step 2: Creating TextToSpeechService...")
-        try {
-            ttsService.initialize()
-            Log.d(TAG, "Step 2: TextToSpeechService initialized")
-        } catch (e: Exception) {
-            Log.e(TAG, "Step 2 FAILED: TextToSpeechService error: ${e.message}", e)
-            _uiState.update { it.copy(errorMessage = "TTS service error: ${e.message}") }
-            return
-        }
-
-        Log.d(TAG, "Step 3: Setting up voice command callback...")
-        try {
-            voiceService.onCommandRecognized = { command ->
-                processCommand(command)
+        // Auto-listen after TTS finishes speaking
+        ttsService.onSpeechComplete = {
+            if (_uiState.value.autoListenEnabled && !_uiState.value.isProcessing) {
+                // Small delay before starting to listen
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(300)
+                    startListening()
+                }
             }
-            Log.d(TAG, "Step 3: Voice callback set up")
-        } catch (e: Exception) {
-            Log.e(TAG, "Step 3 FAILED: Voice callback error: ${e.message}", e)
-            _uiState.update { it.copy(errorMessage = "Voice callback error: ${e.message}") }
-            return
         }
+    }
 
-        Log.d(TAG, "All services initialized successfully!")
+    /**
+     * Toggle auto-listen mode
+     */
+    fun toggleAutoListen() {
+        _uiState.update { it.copy(autoListenEnabled = !it.autoListenEnabled) }
+    }
+
+    /**
+     * Set auto-listen mode
+     */
+    fun setAutoListen(enabled: Boolean) {
+        _uiState.update { it.copy(autoListenEnabled = enabled) }
+    }
+
+    /**
+     * Check if app was activated by wake word and start listening
+     */
+    fun checkWakeWordActivation() {
+        if (MainActivity.startListeningOnResume) {
+            MainActivity.startListeningOnResume = false
+
+            // Greet and start listening
+            viewModelScope.launch {
+                // Small delay to let UI settle
+                kotlinx.coroutines.delay(500)
+
+                // Speak greeting
+                speak("Olá! Em que posso ajudar?")
+            }
+        }
     }
 
     private fun observeVoiceState() {
-        // Observe voice state
         viewModelScope.launch {
             voiceService.state.collect { state ->
                 when (state) {
@@ -153,15 +138,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _uiState.update { it.copy(currentText = state.text) }
                     }
                     is VoiceState.Error -> {
-                        _uiState.update { it.copy(isListening = false, isProcessing = false) }
+                        _uiState.update {
+                            it.copy(
+                                isListening = false,
+                                isProcessing = false
+                            )
+                        }
+                        // Don't show error for normal timeouts
                     }
                 }
-            }
-        }
-        // Observe audio level
-        viewModelScope.launch {
-            voiceService.audioLevel.collect { level ->
-                _audioLevel.value = level
             }
         }
     }
@@ -174,62 +159,63 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun observeServiceState() {
+    /**
+     * Load data for voice responses
+     */
+    fun loadInitialData() {
         viewModelScope.launch {
-            EmisferiaForegroundService.isRunning.collect { running ->
-                _uiState.update { it.copy(isServiceRunning = running) }
-            }
-        }
-    }
+            println("[MainViewModel] Loading initial data from: ${com.emisferia.proactive.BuildConfig.API_URL}")
 
-    private fun checkConnection() {
-        viewModelScope.launch {
-            repository.getDashboard().onSuccess {
+            // Load dashboard
+            repository.getDashboard().onSuccess { data ->
+                _dashboard.value = data
                 _uiState.update { it.copy(isConnected = true) }
-                Log.d(TAG, "Connection successful")
+                println("[MainViewModel] Dashboard loaded successfully!")
             }.onFailure { error ->
                 _uiState.update { it.copy(isConnected = false) }
-                Log.e(TAG, "Connection failed: ${error.message}")
-            }
-        }
-    }
+                println("[MainViewModel] Dashboard failed: ${error.javaClass.simpleName} - ${error.message}")
 
-    /**
-     * Check for app updates from GitHub
-     */
-    private fun checkForUpdates() {
-        viewModelScope.launch {
-            try {
-                val updateInfo = UpdateChecker.checkForUpdate()
-                if (updateInfo != null && updateInfo.hasUpdate) {
-                    Log.d(TAG, "Update available: ${updateInfo.latestVersion}")
-                    _uiState.update { it.copy(updateInfo = updateInfo, showUpdateDialog = true) }
-                } else {
-                    Log.d(TAG, "No update available")
+                // Show connection error on startup
+                val startupError = buildString {
+                    append("Nao conectou ao servidor.\n")
+                    append("API: ${com.emisferia.proactive.BuildConfig.API_URL}\n")
+                    append("Erro: ${error.message?.take(100) ?: "Desconhecido"}")
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to check for updates: ${e.message}")
+                addMessage(startupError, isUser = false)
+            }
+
+            // Load today's schedule
+            repository.getTodaySchedule().onSuccess { data ->
+                _schedule.value = data
+            }
+
+            // Load pending tasks
+            repository.getTasks(status = "pending").onSuccess { data ->
+                _tasks.value = data
+            }
+
+            // Load financial summary
+            repository.getFinancialSummary().onSuccess { data ->
+                _financialSummary.value = data
+            }
+
+            // Check for proactive alerts
+            repository.getAlerts().onSuccess { alerts ->
+                val highPriority = alerts.filter { it.priority == "high" }
+                if (highPriority.isNotEmpty()) {
+                    val greeting = getTimeGreeting()
+                    val message = buildString {
+                        append("$greeting! ")
+                        append("Voce tem ${highPriority.size} alerta${if (highPriority.size > 1) "s" else ""} importante${if (highPriority.size > 1) "s" else ""}. ")
+                        highPriority.take(2).forEach { alert ->
+                            append("${alert.title}. ")
+                        }
+                    }
+                    addMessage(message, isUser = false)
+                    speak(message)
+                }
             }
         }
-    }
-
-    /**
-     * Dismiss update dialog
-     */
-    fun dismissUpdateDialog() {
-        _uiState.update { it.copy(showUpdateDialog = false) }
-    }
-
-    /**
-     * Open download page for update
-     */
-    fun downloadUpdate() {
-        _uiState.value.updateInfo?.let { info ->
-            if (info.downloadUrl.isNotEmpty()) {
-                UpdateChecker.openDownloadPage(getApplication(), info.downloadUrl)
-            }
-        }
-        dismissUpdateDialog()
     }
 
     /**
@@ -255,13 +241,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Refresh connection status
-     */
-    fun refreshConnection() {
-        checkConnection()
-    }
-
-    /**
      * Add message to conversation history
      */
     private fun addMessage(text: String, isUser: Boolean) {
@@ -270,94 +249,326 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Speak text
+     * Speak text and add to history
      */
     private fun speak(text: String) {
         ttsService.speak(text)
     }
 
     /**
-     * Process voice command - Uses AI Chat for intelligent responses
+     * Process voice command - Always use AI Chat for full access
      */
     private fun processCommand(command: String) {
-        Log.d(TAG, "Processing command: $command")
-
         // Add user message to history
         addMessage(command, isUser = true)
 
         _uiState.update { it.copy(currentText = "", isProcessing = true) }
 
         viewModelScope.launch {
-            // Check if it's a simple local command first
-            val localResult = processLocalCommand(command.lowercase())
+            // Always send to AI Chat for full processing with tools
+            repository.chat(command).onSuccess { response ->
+                _uiState.update { it.copy(isProcessing = false, isConnected = true) }
 
-            if (localResult != null) {
-                _uiState.update { it.copy(isProcessing = false) }
-                addMessage(localResult, isUser = false)
-                speak(localResult)
-            } else {
-                // Use AI Chat for full interaction - AI has access to all EmisferIA tools
-                repository.chat(command).onSuccess { response ->
-                    _uiState.update { it.copy(isProcessing = false, isConnected = true) }
-                    addMessage(response.response, isUser = false)
-                    speak(response.response)
+                // Show full response with markdown in chat
+                addMessage(response.response, isUser = false)
 
-                    // Log tools used for debugging
-                    response.toolsUsed?.let { tools ->
-                        Log.d(TAG, "AI used tools: ${tools.joinToString(", ")}")
+                // Clean response for TTS (remove markdown)
+                val cleanResponse = cleanForSpeech(response.response)
+                speak(cleanResponse)
+
+                // Log tools used
+                response.toolsUsed?.let { tools ->
+                    if (tools.isNotEmpty()) {
+                        println("AI used tools: ${tools.joinToString(", ")}")
                     }
-
-                }.onFailure { error ->
-                    Log.e(TAG, "AI Chat failed: ${error.message}")
-                    _uiState.update { it.copy(isProcessing = false, isConnected = false) }
-
-                    val errorMsg = "Desculpe, não consegui me conectar ao EmisferIA. Verifique sua conexão."
-                    addMessage(errorMsg, isUser = false)
-                    speak(errorMsg)
                 }
+
+            }.onFailure { error ->
+                _uiState.update { it.copy(isProcessing = false, isConnected = false) }
+
+                // Log full error for debugging
+                val fullError = "${error.javaClass.simpleName}: ${error.message}"
+                println("[MainViewModel] Chat error: $fullError")
+                error.printStackTrace()
+
+                // Show detailed error to help diagnose
+                val errorMsg = buildString {
+                    append("Erro de conexao.\n")
+                    append("URL: ${com.emisferia.proactive.BuildConfig.API_URL}\n")
+                    when {
+                        error.message?.contains("UnknownHost") == true ||
+                        error.message?.contains("Unable to resolve") == true -> {
+                            append("Causa: DNS nao resolveu o dominio.\n")
+                            append("Tente usar dados moveis ou outra rede WiFi.")
+                        }
+                        error.message?.contains("timeout") == true -> {
+                            append("Causa: Servidor nao respondeu a tempo.\n")
+                            append("Verifique sua conexao.")
+                        }
+                        error.message?.contains("SSL") == true ||
+                        error.message?.contains("Certificate") == true -> {
+                            append("Causa: Problema de certificado SSL.\n")
+                            append("Detalhe: ${error.message}")
+                        }
+                        error.message?.contains("Connection refused") == true -> {
+                            append("Causa: Conexao recusada pelo servidor.")
+                        }
+                        else -> {
+                            append("Detalhe: $fullError")
+                        }
+                    }
+                }
+                addMessage(errorMsg, isUser = false)
+                speak("Desculpe, nao consegui me conectar ao servidor.")
             }
         }
     }
 
     /**
-     * Process simple local commands for faster response
-     * More complex queries go to AI Chat
+     * Clean markdown formatting for TTS
+     */
+    private fun cleanForSpeech(text: String): String {
+        return text
+            // Remove bold/italic markers
+            .replace(Regex("\\*\\*(.+?)\\*\\*"), "$1")
+            .replace(Regex("\\*(.+?)\\*"), "$1")
+            .replace(Regex("_(.+?)_"), "$1")
+            // Remove headers
+            .replace(Regex("^#{1,6}\\s*", RegexOption.MULTILINE), "")
+            // Remove bullet points but keep text
+            .replace(Regex("^[\\-\\*•]\\s*", RegexOption.MULTILINE), "")
+            .replace(Regex("^\\d+\\.\\s*", RegexOption.MULTILINE), "")
+            // Remove ALL emojis
+            .let { removeEmojis(it) }
+            // Clean extra whitespace
+            .replace(Regex("\\n{3,}"), "\n\n")
+            .replace(Regex(" {2,}"), " ")
+            .trim()
+    }
+
+    /**
+     * Remove all emojis from text using comprehensive Unicode ranges
+     */
+    private fun removeEmojis(text: String): String {
+        val sb = StringBuilder()
+        var i = 0
+        while (i < text.length) {
+            val codePoint = text.codePointAt(i)
+
+            // Skip if it's an emoji or emoji-related character
+            val isEmoji = when {
+                // Emoticons
+                codePoint in 0x1F600..0x1F64F -> true
+                // Miscellaneous Symbols and Pictographs
+                codePoint in 0x1F300..0x1F5FF -> true
+                // Transport and Map Symbols
+                codePoint in 0x1F680..0x1F6FF -> true
+                // Supplemental Symbols and Pictographs
+                codePoint in 0x1F900..0x1F9FF -> true
+                // Symbols and Pictographs Extended-A
+                codePoint in 0x1FA00..0x1FA6F -> true
+                codePoint in 0x1FA70..0x1FAFF -> true
+                // Dingbats
+                codePoint in 0x2700..0x27BF -> true
+                // Miscellaneous Symbols
+                codePoint in 0x2600..0x26FF -> true
+                // Geometric Shapes Extended
+                codePoint in 0x1F780..0x1F7FF -> true
+                // Enclosed Alphanumeric Supplement
+                codePoint in 0x1F100..0x1F1FF -> true
+                // Regional Indicator Symbols (flags)
+                codePoint in 0x1F1E0..0x1F1FF -> true
+                // Mahjong Tiles
+                codePoint in 0x1F000..0x1F02F -> true
+                // Playing Cards
+                codePoint in 0x1F0A0..0x1F0FF -> true
+                // Arrows (some are used as emoji)
+                codePoint in 0x2190..0x21FF -> true
+                // Mathematical Operators (some are used as emoji)
+                codePoint in 0x2200..0x22FF -> true
+                // Box Drawing and Geometric shapes
+                codePoint in 0x25A0..0x25FF -> true
+                // Variation Selectors
+                codePoint == 0xFE0F || codePoint == 0xFE0E -> true
+                // Zero Width Joiner
+                codePoint == 0x200D -> true
+                // Copyright, Registered, Trademark symbols often rendered as emoji
+                codePoint == 0x00A9 || codePoint == 0x00AE || codePoint == 0x2122 -> true
+                // Other common emoji-like symbols
+                codePoint in 0x2300..0x23FF -> true  // Miscellaneous Technical
+                codePoint in 0x2B00..0x2BFF -> true  // Miscellaneous Symbols and Arrows (⭕, ⬛, etc.)
+                codePoint in 0x3000..0x303F -> true  // CJK Symbols
+                // Number/letter enclosed in circles
+                codePoint in 0x2460..0x24FF -> true
+                else -> false
+            }
+
+            if (!isEmoji) {
+                sb.appendCodePoint(codePoint)
+            }
+
+            i += Character.charCount(codePoint)
+        }
+        return sb.toString().replace(Regex(" {2,}"), " ").trim()
+    }
+
+    /**
+     * Process common commands locally for faster response
      */
     private fun processLocalCommand(command: String): String? {
         return when {
-            // Simple greetings
-            command.matches(Regex("^(oi|olá|ola|hey|ei)$")) -> {
-                val greeting = getTimeGreeting()
-                "$greeting! Estou aqui. Pergunte qualquer coisa sobre suas tarefas, agenda, finanças ou ideias."
+            // Tasks
+            command.contains("tarefa") && (command.contains("quais") || command.contains("minhas")) -> {
+                buildTasksResponse()
+            }
+            command.contains("tarefa") && command.contains("urgente") -> {
+                val urgent = _tasks.value.filter { it.priority == "urgent" }
+                if (urgent.isEmpty()) {
+                    "Voce nao tem tarefas urgentes no momento."
+                } else {
+                    "Voce tem ${urgent.size} tarefa${if (urgent.size > 1) "s" else ""} urgente${if (urgent.size > 1) "s" else ""}. " +
+                        urgent.take(3).joinToString(". ") { it.title }
+                }
             }
 
-            command.matches(Regex("^(bom dia|boa tarde|boa noite)$")) -> {
-                val greeting = getTimeGreeting()
-                "$greeting! Como posso ajudar?"
+            // Schedule
+            command.contains("compromisso") || command.contains("agenda") ||
+                (command.contains("hoje") && !command.contains("tarefa")) -> {
+                buildScheduleResponse()
             }
 
-            // Thanks
-            command.contains("obrigado") || command.contains("valeu") || command.contains("thanks") -> {
-                "De nada! Estou aqui se precisar de mais alguma coisa."
+            // Financial
+            command.contains("financeiro") || command.contains("dinheiro") ||
+                command.contains("receber") || command.contains("pagar") -> {
+                buildFinancialResponse()
+            }
+
+            // Messages
+            command.contains("mensagem") || command.contains("whatsapp") -> {
+                buildMessagesResponse()
+            }
+
+            // General status
+            command.contains("status") || command.contains("resumo") -> {
+                buildStatusResponse()
+            }
+
+            // Greetings
+            command.contains("ola") || command.contains("oi") ||
+                command.contains("bom dia") || command.contains("boa tarde") ||
+                command.contains("boa noite") -> {
+                val greeting = getTimeGreeting()
+                "$greeting! Estou aqui. O que precisa?"
             }
 
             // Help
-            command == "ajuda" || command == "o que você faz" || command == "o que voce faz" -> {
-                "Sou o EmisferIA, seu assistente pessoal. Posso: " +
-                "consultar suas tarefas e agenda, " +
-                "ver seu financeiro e saldo, " +
-                "gerenciar suas ideias, " +
-                "criar novas tarefas ou compromissos, " +
-                "e muito mais. Apenas pergunte naturalmente!"
+            command.contains("ajuda") || command.contains("o que voce faz") ||
+                command.contains("como funciona") -> {
+                "Voce pode me perguntar sobre suas tarefas, compromissos, financeiro, ou pedir um resumo do dia. Tambem posso criar tarefas e enviar mensagens."
             }
 
-            // Stop/cancel
-            command == "para" || command == "parar" || command == "cancela" || command == "cancelar" -> {
-                stopSpeaking()
-                null // Don't respond
+            // Thanks
+            command.contains("obrigado") || command.contains("valeu") -> {
+                "De nada! Estou aqui se precisar."
             }
 
-            else -> null // Let AI handle it
+            else -> null // Let server handle unknown commands
+        }
+    }
+
+    private fun buildTasksResponse(): String {
+        val pending = _tasks.value.filter { it.status != "done" && it.status != "cancelled" }
+        return if (pending.isEmpty()) {
+            "Voce nao tem tarefas pendentes. Parabens!"
+        } else {
+            val urgent = pending.count { it.priority == "urgent" }
+            val high = pending.count { it.priority == "high" }
+
+            buildString {
+                append("Voce tem ${pending.size} tarefa${if (pending.size > 1) "s" else ""} pendente${if (pending.size > 1) "s" else ""}. ")
+                if (urgent > 0) append("$urgent urgente${if (urgent > 1) "s" else ""}. ")
+                if (high > 0) append("$high de alta prioridade. ")
+                append("As principais sao: ")
+                pending.take(3).forEachIndexed { index, task ->
+                    append("${index + 1}, ${task.title}. ")
+                }
+            }
+        }
+    }
+
+    private fun buildScheduleResponse(): String {
+        val today = _schedule.value
+        return if (today.isEmpty()) {
+            "Voce nao tem compromissos agendados para hoje."
+        } else {
+            buildString {
+                append("Voce tem ${today.size} compromisso${if (today.size > 1) "s" else ""} hoje. ")
+                today.take(3).forEach { event ->
+                    val time = try {
+                        event.startAt.substring(11, 16)
+                    } catch (e: Exception) { "" }
+                    append("As $time, ${event.title}. ")
+                }
+            }
+        }
+    }
+
+    private fun buildFinancialResponse(): String {
+        val summary = _financialSummary.value
+            ?: return "Nao consegui carregar as informacoes financeiras."
+
+        return buildString {
+            append("Resumo financeiro. ")
+            if (summary.totalReceivable > 0) {
+                append("Voce tem ${formatCurrency(summary.totalReceivable)} a receber. ")
+            }
+            if (summary.totalPayable > 0) {
+                append("E ${formatCurrency(summary.totalPayable)} a pagar. ")
+            }
+            if (summary.overdueReceivable > 0) {
+                append("Atencao: ${formatCurrency(summary.overdueReceivable)} esta vencido para receber. ")
+            }
+            if (summary.overduePayable > 0) {
+                append("E ${formatCurrency(summary.overduePayable)} esta vencido para pagar. ")
+            }
+            append("Saldo do mes: ${formatCurrency(summary.balance)}.")
+        }
+    }
+
+    private fun buildMessagesResponse(): String {
+        val pending = _dashboard.value?.stats?.pendingResponses ?: 0
+        return if (pending == 0) {
+            "Voce nao tem mensagens pendentes."
+        } else {
+            "Voce tem $pending mensagem${if (pending > 1) "ns" else ""} aguardando resposta."
+        }
+    }
+
+    private fun buildStatusResponse(): String {
+        val stats = _dashboard.value?.stats
+            ?: return "Nao consegui carregar seu status."
+
+        return buildString {
+            append(getTimeGreeting() + "! ")
+            append("Aqui esta seu resumo. ")
+
+            if (stats.pendingTasks > 0) {
+                append("${stats.pendingTasks} tarefa${if (stats.pendingTasks > 1) "s" else ""} pendente${if (stats.pendingTasks > 1) "s" else ""}. ")
+            }
+
+            if (stats.upcomingEvents > 0) {
+                append("${stats.upcomingEvents} compromisso${if (stats.upcomingEvents > 1) "s" else ""} proximo${if (stats.upcomingEvents > 1) "s" else ""}. ")
+            }
+
+            if (stats.pendingResponses > 0) {
+                append("${stats.pendingResponses} mensagem${if (stats.pendingResponses > 1) "ns" else ""} para responder. ")
+            }
+
+            if (stats.overdueReceivables > 0) {
+                append("${formatCurrency(stats.overdueReceivables)} a cobrar. ")
+            }
+
+            append("Faturamento do mes: ${formatCurrency(stats.revenueThisMonth)}.")
         }
     }
 
@@ -370,10 +581,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun formatCurrency(value: Double): String {
+        return "R$ ${String.format("%.2f", value).replace(".", ",")}"
+    }
+
     override fun onCleared() {
         super.onCleared()
         voiceService.destroy()
         ttsService.destroy()
-        // Note: Don't stop the foreground service here - it should keep running
     }
 }

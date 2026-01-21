@@ -7,7 +7,6 @@ import android.util.Log
 import com.emisferia.proactive.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import java.net.URL
 
 /**
@@ -40,7 +39,7 @@ object UpdateChecker {
                 val response = connection.getInputStream().bufferedReader().readText()
                 val json = org.json.JSONObject(response)
 
-                val tagName = json.getString("tag_name") // e.g., "v1.1.0"
+                val tagName = json.getString("tag_name") // e.g., "v1.4.0"
                 val latestVersion = tagName.removePrefix("v")
                 val currentVersion = BuildConfig.VERSION_NAME
                 val releaseNotes = json.optString("body", "")
@@ -77,7 +76,7 @@ object UpdateChecker {
     }
 
     /**
-     * Compare version strings (e.g., "1.1.0" > "1.0.0")
+     * Compare version strings (e.g., "1.5.0" > "1.4.0")
      */
     private fun isNewerVersion(latest: String, current: String): Boolean {
         try {

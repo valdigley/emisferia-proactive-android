@@ -14,27 +14,11 @@ import java.util.concurrent.TimeUnit
  */
 interface EmisferiaApiService {
 
-    // ==========================================
-    // AI CHAT - Main interaction endpoint
-    // ==========================================
-
-    @POST("ai/chat")
-    suspend fun chat(@Body request: AIChatRequest): Response<ApiResponse<AIChatResponse>>
-
-    // ==========================================
-    // DASHBOARD
-    // ==========================================
-
+    // Dashboard
     @GET("dashboard")
     suspend fun getDashboard(): Response<ApiResponse<DashboardData>>
 
-    @GET("dashboard/stats")
-    suspend fun getStats(): Response<ApiResponse<DashboardStats>>
-
-    // ==========================================
-    // TASKS
-    // ==========================================
-
+    // Tasks
     @GET("tasks")
     suspend fun getTasks(
         @Query("status") status: String? = null,
@@ -48,98 +32,51 @@ interface EmisferiaApiService {
     @POST("tasks")
     suspend fun createTask(@Body request: CreateTaskRequest): Response<ApiResponse<Task>>
 
-    @PUT("tasks/{id}")
+    @PATCH("tasks/{id}")
     suspend fun updateTask(
         @Path("id") id: String,
         @Body updates: Map<String, Any>
     ): Response<ApiResponse<Task>>
 
-    @POST("tasks/{id}/complete")
+    @PATCH("tasks/{id}/complete")
     suspend fun completeTask(@Path("id") id: String): Response<ApiResponse<Task>>
 
-    @POST("tasks/{id}/postpone")
-    suspend fun postponeTask(@Path("id") id: String): Response<ApiResponse<Task>>
-
-    // ==========================================
-    // SCHEDULE
-    // ==========================================
-
+    // Schedule
     @GET("schedule")
     suspend fun getSchedule(
-        @Query("start") startDate: String? = null,
-        @Query("end") endDate: String? = null
+        @Query("start_date") startDate: String? = null,
+        @Query("end_date") endDate: String? = null
     ): Response<ApiResponse<List<Schedule>>>
 
     @GET("schedule/today")
     suspend fun getTodaySchedule(): Response<ApiResponse<List<Schedule>>>
 
-    @GET("schedule/week")
-    suspend fun getWeekSchedule(): Response<ApiResponse<List<Schedule>>>
+    // Financial
+    @GET("financial/summary")
+    suspend fun getFinancialSummary(): Response<ApiResponse<FinancialSummary>>
 
-    @POST("schedule")
-    suspend fun createSchedule(@Body request: CreateScheduleRequest): Response<ApiResponse<Schedule>>
-
-    // ==========================================
-    // FINANCIAL
-    // ==========================================
-
-    @GET("financial/dashboard")
-    suspend fun getFinancialDashboard(): Response<ApiResponse<FinancialDashboard>>
-
-    @GET("financial")
+    @GET("financial/entries")
     suspend fun getFinancialEntries(
         @Query("type") type: String? = null,
         @Query("status") status: String? = null,
         @Query("limit") limit: Int = 50
     ): Response<ApiResponse<List<FinancialEntry>>>
 
-    @GET("financial/overdue")
-    suspend fun getOverdueEntries(): Response<ApiResponse<List<FinancialEntry>>>
-
-    @GET("financial/upcoming")
-    suspend fun getUpcomingPayments(): Response<ApiResponse<List<FinancialEntry>>>
-
-    // ==========================================
-    // IDEAS
-    // ==========================================
-
-    @GET("ideas")
-    suspend fun getIdeas(
-        @Query("status") status: String? = null,
-        @Query("category") category: String? = null,
-        @Query("limit") limit: Int = 50
-    ): Response<ApiResponse<List<Idea>>>
-
-    @GET("ideas/high-priority")
-    suspend fun getHighPriorityIdeas(): Response<ApiResponse<List<Idea>>>
-
-    @POST("ideas")
-    suspend fun createIdea(@Body request: CreateIdeaRequest): Response<ApiResponse<Idea>>
-
-    // ==========================================
-    // DEALS
-    // ==========================================
-
+    // Deals
     @GET("deals")
     suspend fun getDeals(
         @Query("stage") stage: String? = null,
         @Query("limit") limit: Int = 50
     ): Response<ApiResponse<List<Deal>>>
 
-    // ==========================================
-    // WORKS
-    // ==========================================
-
+    // Works
     @GET("works")
     suspend fun getWorks(
         @Query("status") status: String? = null,
         @Query("limit") limit: Int = 50
     ): Response<ApiResponse<List<Work>>>
 
-    // ==========================================
-    // CONTACTS
-    // ==========================================
-
+    // Contacts
     @GET("contacts")
     suspend fun getContacts(
         @Query("search") search: String? = null,
@@ -149,40 +86,30 @@ interface EmisferiaApiService {
     @GET("contacts/{id}")
     suspend fun getContact(@Path("id") id: String): Response<ApiResponse<Contact>>
 
-    // ==========================================
-    // MESSAGES
-    // ==========================================
+    // Messages
+    @GET("messages/conversations")
+    suspend fun getConversations(
+        @Query("unread_only") unreadOnly: Boolean = false
+    ): Response<ApiResponse<List<Conversation>>>
 
-    @GET("messages")
-    suspend fun getMessages(
-        @Query("unreadOnly") unreadOnly: Boolean = false,
-        @Query("limit") limit: Int = 50
-    ): Response<ApiResponse<List<Message>>>
-
-    // ==========================================
-    // PROACTIVE
-    // ==========================================
-
+    // Proactive
     @GET("proactive/alerts")
-    suspend fun getAlerts(): Response<ApiResponse<List<ProactiveAlert>>>
+    suspend fun getAlerts(): Response<ApiResponse<List<ProactiveNotification>>>
 
-    @GET("proactive/checkin/morning")
-    suspend fun getMorningCheckin(): Response<ApiResponse<CheckinData>>
+    @GET("proactive/notifications/pending")
+    suspend fun getPendingNotifications(): Response<ApiResponse<List<ProactiveNotification>>>
 
-    @GET("proactive/checkin/afternoon")
-    suspend fun getAfternoonCheckin(): Response<ApiResponse<CheckinData>>
+    // AI Chat (full access to EmisferIA tools)
+    @POST("ai/chat")
+    suspend fun chat(
+        @Body request: ChatRequest
+    ): Response<ApiResponse<ChatResponse>>
 
-    @GET("proactive/checkin/evening")
-    suspend fun getEveningCheckin(): Response<ApiResponse<CheckinData>>
-
-    @GET("proactive/focus/next-task")
-    suspend fun getNextFocusTask(): Response<ApiResponse<FocusTask>>
-
-    @GET("proactive/focus/message")
-    suspend fun getFocusMessage(): Response<ApiResponse<Map<String, String>>>
-
-    @GET("proactive/payments/summary")
-    suspend fun getPaymentSummary(): Response<ApiResponse<PaymentSummary>>
+    // Voice Commands (legacy)
+    @POST("proactive/voice/command")
+    suspend fun processVoiceCommand(
+        @Body request: VoiceCommandRequest
+    ): Response<ApiResponse<VoiceCommandResponse>>
 }
 
 /**
@@ -190,13 +117,13 @@ interface EmisferiaApiService {
  */
 object EmisferiaApi {
 
-    private const val DEFAULT_TIMEOUT = 60L // Increased for AI responses
+    private const val DEFAULT_TIMEOUT = 30L
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = if (BuildConfig.DEBUG) {
             HttpLoggingInterceptor.Level.BODY
         } else {
-            HttpLoggingInterceptor.Level.BASIC
+            HttpLoggingInterceptor.Level.NONE
         }
     }
 
@@ -209,7 +136,8 @@ object EmisferiaApi {
             val request = chain.request().newBuilder()
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Accept", "application/json")
-                .addHeader("X-Client", "EmisferIA-Android")
+                // Add auth token if available
+                // .addHeader("Authorization", "Bearer $token")
                 .build()
             chain.proceed(request)
         }
@@ -228,20 +156,26 @@ object EmisferiaApi {
      */
     suspend fun <T> safeApiCall(call: suspend () -> Response<ApiResponse<T>>): Result<T> {
         return try {
+            println("[EmisferiaAPI] Making API call...")
             val response = call()
+            println("[EmisferiaAPI] Response code: ${response.code()}")
             if (response.isSuccessful) {
                 val body = response.body()
+                println("[EmisferiaAPI] Body success: ${body?.success}, has data: ${body?.data != null}")
                 if (body?.data != null) {
                     Result.success(body.data)
-                } else if (body?.error != null) {
-                    Result.failure(Exception(body.error))
                 } else {
+                    println("[EmisferiaAPI] Empty data, message: ${body?.message}")
                     Result.failure(Exception(body?.message ?: "Empty response"))
                 }
             } else {
+                val errorBody = response.errorBody()?.string()
+                println("[EmisferiaAPI] Error response: $errorBody")
                 Result.failure(Exception("Error: ${response.code()} - ${response.message()}"))
             }
         } catch (e: Exception) {
+            println("[EmisferiaAPI] Exception: ${e.javaClass.simpleName} - ${e.message}")
+            e.printStackTrace()
             Result.failure(e)
         }
     }
@@ -254,51 +188,17 @@ class EmisferiaRepository {
 
     private val api = EmisferiaApi.service
 
-    // Conversation history for AI chat
-    private val conversationHistory = mutableListOf<ChatMessage>()
-
-    /**
-     * Chat with AI - Main method for all interactions
-     * The AI has access to all EmisferIA tools and data
-     */
-    suspend fun chat(message: String): Result<AIChatResponse> {
-        // Add user message to history
-        conversationHistory.add(ChatMessage(role = "user", content = message))
-
-        val result = EmisferiaApi.safeApiCall {
-            api.chat(AIChatRequest(
-                message = message,
-                conversationHistory = conversationHistory.takeLast(10) // Keep last 10 messages
-            ))
-        }
-
-        // Add assistant response to history if successful
-        result.onSuccess { response ->
-            conversationHistory.add(ChatMessage(role = "assistant", content = response.response))
-        }
-
-        return result
-    }
-
-    fun clearConversationHistory() {
-        conversationHistory.clear()
-    }
-
     suspend fun getDashboard(): Result<DashboardData> {
         return EmisferiaApi.safeApiCall { api.getDashboard() }
-    }
-
-    suspend fun getStats(): Result<DashboardStats> {
-        return EmisferiaApi.safeApiCall { api.getStats() }
     }
 
     suspend fun getTasks(status: String? = null, priority: String? = null): Result<List<Task>> {
         return EmisferiaApi.safeApiCall { api.getTasks(status, priority) }
     }
 
-    suspend fun createTask(title: String, priority: String = "medium", category: String = "other"): Result<Task> {
+    suspend fun createTask(title: String, priority: String = "medium"): Result<Task> {
         return EmisferiaApi.safeApiCall {
-            api.createTask(CreateTaskRequest(title = title, priority = priority, category = category))
+            api.createTask(CreateTaskRequest(title = title, priority = priority))
         }
     }
 
@@ -310,30 +210,12 @@ class EmisferiaRepository {
         return EmisferiaApi.safeApiCall { api.getTodaySchedule() }
     }
 
-    suspend fun getWeekSchedule(): Result<List<Schedule>> {
-        return EmisferiaApi.safeApiCall { api.getWeekSchedule() }
-    }
-
-    suspend fun getFinancialDashboard(): Result<FinancialDashboard> {
-        return EmisferiaApi.safeApiCall { api.getFinancialDashboard() }
+    suspend fun getFinancialSummary(): Result<FinancialSummary> {
+        return EmisferiaApi.safeApiCall { api.getFinancialSummary() }
     }
 
     suspend fun getFinancialEntries(type: String? = null, status: String? = null): Result<List<FinancialEntry>> {
         return EmisferiaApi.safeApiCall { api.getFinancialEntries(type, status) }
-    }
-
-    suspend fun getOverdueEntries(): Result<List<FinancialEntry>> {
-        return EmisferiaApi.safeApiCall { api.getOverdueEntries() }
-    }
-
-    suspend fun getIdeas(status: String? = null): Result<List<Idea>> {
-        return EmisferiaApi.safeApiCall { api.getIdeas(status) }
-    }
-
-    suspend fun createIdea(title: String, description: String? = null, category: String = "other"): Result<Idea> {
-        return EmisferiaApi.safeApiCall {
-            api.createIdea(CreateIdeaRequest(title = title, description = description, category = category))
-        }
     }
 
     suspend fun getDeals(): Result<List<Deal>> {
@@ -348,31 +230,27 @@ class EmisferiaRepository {
         return EmisferiaApi.safeApiCall { api.getContacts(search) }
     }
 
-    suspend fun getMessages(unreadOnly: Boolean = false): Result<List<Message>> {
-        return EmisferiaApi.safeApiCall { api.getMessages(unreadOnly) }
+    suspend fun getConversations(unreadOnly: Boolean = false): Result<List<Conversation>> {
+        return EmisferiaApi.safeApiCall { api.getConversations(unreadOnly) }
     }
 
-    suspend fun getAlerts(): Result<List<ProactiveAlert>> {
+    suspend fun getAlerts(): Result<List<ProactiveNotification>> {
         return EmisferiaApi.safeApiCall { api.getAlerts() }
     }
 
-    suspend fun getMorningCheckin(): Result<CheckinData> {
-        return EmisferiaApi.safeApiCall { api.getMorningCheckin() }
+    /**
+     * Chat with EmisferIA AI - full access to all tools
+     */
+    suspend fun chat(message: String): Result<ChatResponse> {
+        println("[EmisferiaRepo] Chat request: $message")
+        return EmisferiaApi.safeApiCall {
+            api.chat(ChatRequest(message = message))
+        }
     }
 
-    suspend fun getAfternoonCheckin(): Result<CheckinData> {
-        return EmisferiaApi.safeApiCall { api.getAfternoonCheckin() }
-    }
-
-    suspend fun getEveningCheckin(): Result<CheckinData> {
-        return EmisferiaApi.safeApiCall { api.getEveningCheckin() }
-    }
-
-    suspend fun getNextFocusTask(): Result<FocusTask> {
-        return EmisferiaApi.safeApiCall { api.getNextFocusTask() }
-    }
-
-    suspend fun getPaymentSummary(): Result<PaymentSummary> {
-        return EmisferiaApi.safeApiCall { api.getPaymentSummary() }
+    suspend fun processVoiceCommand(command: String): Result<VoiceCommandResponse> {
+        return EmisferiaApi.safeApiCall {
+            api.processVoiceCommand(VoiceCommandRequest(command = command, context = null))
+        }
     }
 }

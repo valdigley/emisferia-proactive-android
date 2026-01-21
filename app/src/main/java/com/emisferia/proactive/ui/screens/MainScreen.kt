@@ -1,5 +1,7 @@
 package com.emisferia.proactive.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -17,14 +19,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.emisferia.proactive.BuildConfig
+import com.emisferia.proactive.service.UpdateChecker
 import com.emisferia.proactive.ui.components.*
 import com.emisferia.proactive.ui.theme.*
 import com.emisferia.proactive.viewmodel.*
-import com.emisferia.proactive.service.UpdateChecker
 import kotlinx.coroutines.delay
 
 /**
@@ -36,9 +40,81 @@ import kotlinx.coroutines.delay
 fun MainScreen(
     viewModel: MainViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
-    val audioLevel by viewModel.audioLevel.collectAsState()
+    val audioLevel by viewModel.voiceService.audioLevel.collectAsState()
     val messages by viewModel.conversationHistory.collectAsState()
+
+    // Update state
+    var updateInfo by remember { mutableStateOf<UpdateChecker.UpdateInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+
+    // Check for updates on launch
+    LaunchedEffect(Unit) {
+        delay(3000) // Wait for app to settle
+        val info = UpdateChecker.checkForUpdate()
+        if (info?.hasUpdate == true) {
+            updateInfo = info
+            showUpdateDialog = true
+        }
+    }
+
+    // Check for wake word activation (from "Assistente" voice command)
+    LaunchedEffect(Unit) {
+        viewModel.checkWakeWordActivation()
+    }
+
+    // Update dialog
+    if (showUpdateDialog && updateInfo != null) {
+        AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            title = {
+                Text(
+                    "Atualização Disponível",
+                    color = NeonCyan
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "Nova versão: ${updateInfo!!.latestVersion}",
+                        color = TextPrimary
+                    )
+                    Text(
+                        "Versão atual: ${updateInfo!!.currentVersion}",
+                        color = TextSecondary
+                    )
+                    if (updateInfo!!.releaseNotes.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            updateInfo!!.releaseNotes,
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUpdateDialog = false
+                        if (updateInfo!!.downloadUrl.isNotEmpty()) {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo!!.downloadUrl))
+                            context.startActivity(intent)
+                        }
+                    }
+                ) {
+                    Text("Baixar", color = NeonCyan)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdateDialog = false }) {
+                    Text("Depois", color = TextMuted)
+                }
+            },
+            containerColor = DarkSurface
+        )
+    }
 
     // Auto-scroll to latest message
     val listState = rememberLazyListState()
@@ -48,31 +124,7 @@ fun MainScreen(
         }
     }
 
-    // Auto-listening enabled - continuous voice interaction
-    var autoListenEnabled by remember { mutableStateOf(false) }
-
-    // Continuous listening mode - always listening when not speaking
-    LaunchedEffect(uiState.isListening, uiState.isSpeaking, uiState.isProcessing, autoListenEnabled) {
-        if (autoListenEnabled && !uiState.isListening && !uiState.isSpeaking && !uiState.isProcessing) {
-            delay(2000) // Pause before restarting listening
-            try {
-                viewModel.startListening()
-            } catch (e: Exception) {
-                // Ignore errors
-            }
-        }
-    }
-
-    // Start listening after app initializes
-    LaunchedEffect(Unit) {
-        delay(3000) // Wait for everything to initialize
-        autoListenEnabled = true
-        try {
-            viewModel.startListening()
-        } catch (e: Exception) {
-            // Ignore errors
-        }
-    }
+    // No continuous listening - user taps to speak
 
     Box(
         modifier = Modifier
@@ -147,18 +199,22 @@ fun MainScreen(
                 }
             }
 
-            // Central Neural Wave - tap to start listening
+            // Central Neural Wave - Tap to speak
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp)
-                    .clickable {
-                        if (!uiState.isListening && !uiState.isSpeaking) {
-                            try {
-                                viewModel.startListening()
-                            } catch (e: Exception) {
-                                // Ignore
-                            }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        // Tap to toggle listening
+                        if (uiState.isSpeaking) {
+                            viewModel.stopSpeaking()
+                        } else if (uiState.isListening) {
+                            viewModel.stopListening()
+                        } else if (!uiState.isProcessing) {
+                            viewModel.startListening()
                         }
                     },
                 contentAlignment = Alignment.Center
@@ -193,16 +249,28 @@ fun MainScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-        }
+            // Tap to speak hint (when idle)
+            AnimatedVisibility(
+                visible = !uiState.isListening && !uiState.isSpeaking && !uiState.isProcessing,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Text(
+                    text = "Toque para falar",
+                    color = TextMuted.copy(alpha = 0.6f),
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
 
-        // Update Dialog
-        if (uiState.showUpdateDialog && uiState.updateInfo != null) {
-            UpdateDialog(
-                updateInfo = uiState.updateInfo!!,
-                onDismiss = { viewModel.dismissUpdateDialog() },
-                onUpdate = { viewModel.downloadUpdate() }
+            // Version indicator
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                color = TextMuted.copy(alpha = 0.5f),
+                fontSize = 10.sp
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -377,71 +445,5 @@ private fun LiveTranscription(
         color = NeonGreen.copy(alpha = 0.5f),
         textAlign = TextAlign.Center,
         modifier = modifier
-    )
-}
-
-/**
- * Update available dialog
- */
-@Composable
-private fun UpdateDialog(
-    updateInfo: UpdateChecker.UpdateInfo,
-    onDismiss: () -> Unit,
-    onUpdate: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = DarkSurface,
-        titleContentColor = TextPrimary,
-        textContentColor = TextSecondary,
-        title = {
-            Text(
-                text = "Atualização Disponível",
-                style = MaterialTheme.typography.titleLarge
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Nova versão ${updateInfo.latestVersion} disponível!",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = "Versão atual: ${updateInfo.currentVersion}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-                if (updateInfo.releaseNotes.isNotEmpty()) {
-                    Text(
-                        text = updateInfo.releaseNotes.take(200) +
-                            if (updateInfo.releaseNotes.length > 200) "..." else "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary.copy(alpha = 0.7f)
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onUpdate,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = NeonCyan
-                )
-            ) {
-                Text("Atualizar")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = TextSecondary
-                )
-            ) {
-                Text("Depois")
-            }
-        }
     )
 }
