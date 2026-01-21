@@ -37,7 +37,7 @@ fun MainScreen(
     viewModel: MainViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val audioLevel by viewModel.voiceService.audioLevel.collectAsState()
+    val audioLevel by viewModel.audioLevel.collectAsState()
     val messages by viewModel.conversationHistory.collectAsState()
 
     // Auto-scroll to latest message

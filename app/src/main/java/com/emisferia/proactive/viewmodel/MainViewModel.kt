@@ -48,11 +48,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val TAG = "MainViewModel"
     }
 
-    private val repository = EmisferiaRepository()
+    // Repository - lazy initialization
+    private val repository: EmisferiaRepository by lazy {
+        Log.d(TAG, "Creating EmisferiaRepository")
+        EmisferiaRepository()
+    }
 
-    // Services
-    val voiceService = VoiceRecognitionService(application)
-    private val ttsService = TextToSpeechService(application)
+    // Services - lazy initialization for safety
+    val voiceService: VoiceRecognitionService by lazy {
+        Log.d(TAG, "Creating VoiceRecognitionService")
+        VoiceRecognitionService(getApplication())
+    }
+
+    private val ttsService: TextToSpeechService by lazy {
+        Log.d(TAG, "Creating TextToSpeechService")
+        TextToSpeechService(getApplication())
+    }
 
     // UI State
     private val _uiState = MutableStateFlow(MainUiState())
@@ -62,45 +73,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _conversationHistory = MutableStateFlow<List<ConversationMessage>>(emptyList())
     val conversationHistory: StateFlow<List<ConversationMessage>> = _conversationHistory.asStateFlow()
 
+    // Audio level for visualization
+    private val _audioLevel = MutableStateFlow(0f)
+    val audioLevel: StateFlow<Float> = _audioLevel.asStateFlow()
+
     init {
-        try {
-            initializeServices()
-            observeVoiceState()
-            observeTtsState()
-            observeServiceState()
-            checkConnection()
-            checkForUpdates()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in ViewModel init: ${e.message}")
+        Log.d(TAG, "ViewModel init started")
+        viewModelScope.launch {
+            try {
+                delay(500) // Small delay to let the UI settle
+                initializeServices()
+                observeVoiceState()
+                observeTtsState()
+                checkConnection()
+                checkForUpdates()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in ViewModel init: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = e.message) }
+            }
         }
     }
 
     private fun initializeServices() {
-        try {
-            voiceService.initialize()
-            ttsService.initialize()
+        Log.d(TAG, "Initializing services")
+        voiceService.initialize()
+        ttsService.initialize()
 
-            // Set up voice command callback
-            voiceService.onCommandRecognized = { command ->
-                processCommand(command)
-            }
-
-            // Start foreground service with delay for proactive features
-            viewModelScope.launch {
-                delay(2000) // Wait for app to fully initialize
-                try {
-                    EmisferiaForegroundService.start(getApplication())
-                    Log.d(TAG, "Foreground service started")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to start foreground service: ${e.message}")
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error initializing services: ${e.message}")
+        // Set up voice command callback
+        voiceService.onCommandRecognized = { command ->
+            processCommand(command)
         }
+        Log.d(TAG, "Services initialized")
     }
 
     private fun observeVoiceState() {
+        // Observe voice state
         viewModelScope.launch {
             voiceService.state.collect { state ->
                 when (state) {
@@ -120,6 +127,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _uiState.update { it.copy(isListening = false, isProcessing = false) }
                     }
                 }
+            }
+        }
+        // Observe audio level
+        viewModelScope.launch {
+            voiceService.audioLevel.collect { level ->
+                _audioLevel.value = level
             }
         }
     }
