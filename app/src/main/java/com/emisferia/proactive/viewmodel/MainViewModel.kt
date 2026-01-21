@@ -78,32 +78,61 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val audioLevel: StateFlow<Float> = _audioLevel.asStateFlow()
 
     init {
-        Log.d(TAG, "ViewModel init started")
+        Log.d(TAG, "ViewModel init started - v1.3.4")
         viewModelScope.launch {
             try {
                 delay(500) // Small delay to let the UI settle
+                Log.d(TAG, "Starting service initialization...")
                 initializeServices()
+                Log.d(TAG, "Services initialized, starting observers...")
                 observeVoiceState()
                 observeTtsState()
+                Log.d(TAG, "Observers started, checking connection...")
                 checkConnection()
+                Log.d(TAG, "Checking for updates...")
                 checkForUpdates()
+                Log.d(TAG, "ViewModel init completed successfully")
             } catch (e: Exception) {
-                Log.e(TAG, "Error in ViewModel init: ${e.message}", e)
-                _uiState.update { it.copy(errorMessage = e.message) }
+                Log.e(TAG, "FATAL Error in ViewModel init: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Init error: ${e.message}") }
             }
         }
     }
 
     private fun initializeServices() {
-        Log.d(TAG, "Initializing services")
-        voiceService.initialize()
-        ttsService.initialize()
-
-        // Set up voice command callback
-        voiceService.onCommandRecognized = { command ->
-            processCommand(command)
+        Log.d(TAG, "Step 1: Creating VoiceRecognitionService...")
+        try {
+            voiceService.initialize()
+            Log.d(TAG, "Step 1: VoiceRecognitionService initialized")
+        } catch (e: Exception) {
+            Log.e(TAG, "Step 1 FAILED: VoiceRecognitionService error: ${e.message}", e)
+            _uiState.update { it.copy(errorMessage = "Voice service error: ${e.message}") }
+            return
         }
-        Log.d(TAG, "Services initialized")
+
+        Log.d(TAG, "Step 2: Creating TextToSpeechService...")
+        try {
+            ttsService.initialize()
+            Log.d(TAG, "Step 2: TextToSpeechService initialized")
+        } catch (e: Exception) {
+            Log.e(TAG, "Step 2 FAILED: TextToSpeechService error: ${e.message}", e)
+            _uiState.update { it.copy(errorMessage = "TTS service error: ${e.message}") }
+            return
+        }
+
+        Log.d(TAG, "Step 3: Setting up voice command callback...")
+        try {
+            voiceService.onCommandRecognized = { command ->
+                processCommand(command)
+            }
+            Log.d(TAG, "Step 3: Voice callback set up")
+        } catch (e: Exception) {
+            Log.e(TAG, "Step 3 FAILED: Voice callback error: ${e.message}", e)
+            _uiState.update { it.copy(errorMessage = "Voice callback error: ${e.message}") }
+            return
+        }
+
+        Log.d(TAG, "All services initialized successfully!")
     }
 
     private fun observeVoiceState() {
