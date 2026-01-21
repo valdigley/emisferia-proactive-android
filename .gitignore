@@ -86,3 +86,4 @@ lint/reports/
 *~
 .DS_Store
 Thumbs.db
+*.keystore
