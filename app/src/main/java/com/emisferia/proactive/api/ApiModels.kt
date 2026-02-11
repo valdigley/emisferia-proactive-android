@@ -166,12 +166,8 @@ data class NotificationAction(
  */
 data class ChatRequest(
     val message: String,
-    val conversationHistory: List<ChatMessage>? = null
-)
-
-data class ChatMessage(
-    val role: String, // "user" or "assistant"
-    val content: String
+    val sessionId: String? = null,
+    val deviceId: String? = null
 )
 
 /**
@@ -179,7 +175,8 @@ data class ChatMessage(
  */
 data class ChatResponse(
     val response: String,
-    val toolsUsed: List<String>?
+    val toolsUsed: List<String>?,
+    val sessionId: String? = null
 )
 
 /**

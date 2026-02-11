@@ -55,6 +55,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _conversationHistory = MutableStateFlow<List<ConversationMessage>>(emptyList())
     val conversationHistory: StateFlow<List<ConversationMessage>> = _conversationHistory.asStateFlow()
 
+    // AI session ID for persistent context (managed server-side)
+    private var aiSessionId: String? = null
+    private val deviceId: String = android.provider.Settings.Secure.getString(
+        application.contentResolver,
+        android.provider.Settings.Secure.ANDROID_ID
+    ) ?: "unknown"
+
     // Data states (cached for voice responses)
     private val _dashboard = MutableStateFlow<DashboardData?>(null)
     private val _tasks = MutableStateFlow<List<Task>>(emptyList())
@@ -266,8 +273,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             // Always send to AI Chat for full processing with tools
-            repository.chat(command).onSuccess { response ->
+            repository.chat(command, aiSessionId, deviceId).onSuccess { response ->
                 _uiState.update { it.copy(isProcessing = false, isConnected = true) }
+
+                // Save session ID for context continuity
+                response.sessionId?.let { aiSessionId = it }
 
                 // Show full response with markdown in chat
                 addMessage(response.response, isUser = false)

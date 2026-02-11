@@ -240,11 +240,12 @@ class EmisferiaRepository {
 
     /**
      * Chat with EmisferIA AI - full access to all tools
+     * Sends sessionId for conversation context persistence
      */
-    suspend fun chat(message: String): Result<ChatResponse> {
-        println("[EmisferiaRepo] Chat request: $message")
+    suspend fun chat(message: String, sessionId: String?, deviceId: String): Result<ChatResponse> {
+        println("[EmisferiaRepo] Chat request: $message (session: ${sessionId?.take(8) ?: "new"})")
         return EmisferiaApi.safeApiCall {
-            api.chat(ChatRequest(message = message))
+            api.chat(ChatRequest(message = message, sessionId = sessionId, deviceId = deviceId))
         }
     }
 
