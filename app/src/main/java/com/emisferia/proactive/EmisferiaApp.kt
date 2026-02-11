@@ -1,9 +1,11 @@
 package com.emisferia.proactive
 
-import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
@@ -15,21 +17,18 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
-class EmisferiaApp : Application() {
+class EmisferiaApp : android.app.Application() {
 
     companion object {
-        const val NOTIFICATION_CHANNEL_ID = "emisferia_proactive"
-        const val NOTIFICATION_CHANNEL_NAME = "EmisferIA Proactive"
+        const val CHANNEL_ID_ALERTS = "emisferia_alerts_v2"
+        const val CHANNEL_ID_VOICE = "emisferia_voice"
+        const val CHANNEL_ID_TTS = "emisferia_tts_service"
         private const val TAG = "EmisferiaApp"
     }
 
     override fun onCreate() {
         super.onCreate()
-
-        // Create notification channel for Android 8.0+
-        createNotificationChannel()
-
-        // Initialize Firebase and register token
+        createNotificationChannels()
         initializeFirebase()
     }
 
@@ -39,12 +38,8 @@ class EmisferiaApp : Application() {
                 Log.w(TAG, "Fetching FCM registration token failed", task.exception)
                 return@addOnCompleteListener
             }
-
-            // Get new FCM registration token
             val token = task.result
             Log.d(TAG, "FCM Token: ${token.take(20)}...")
-
-            // Register token with server
             registerTokenWithServer(token)
         }
     }
@@ -77,20 +72,61 @@ class EmisferiaApp : Application() {
         }
     }
 
-    private fun createNotificationChannel() {
+    private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                NOTIFICATION_CHANNEL_ID,
-                NOTIFICATION_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_DEFAULT
+            val notificationManager = getSystemService(NotificationManager::class.java)
+
+            // Delete old channel with wrong importance
+            notificationManager.deleteNotificationChannel("emisferia_proactive")
+
+            // Channel 1: Alerts (heads-up, sound, vibration)
+            val alertChannel = NotificationChannel(
+                CHANNEL_ID_ALERTS,
+                "EmisferIA Alertas",
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notificacoes proativas do EmisferIA"
+                description = "Check-ins, alertas, pagamentos e lembretes"
                 enableLights(true)
                 enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 200, 300)
+                setShowBadge(true)
+                setSound(
+                    Settings.System.DEFAULT_NOTIFICATION_URI,
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
+            notificationManager.createNotificationChannel(alertChannel)
 
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
+            // Channel 2: Voice reminders (highest priority for heads-up + TTS)
+            val voiceChannel = NotificationChannel(
+                CHANNEL_ID_VOICE,
+                "EmisferIA Voz",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Lembretes com voz - fala automaticamente"
+                enableLights(true)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 500, 300, 500)
+                setShowBadge(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            }
+            notificationManager.createNotificationChannel(voiceChannel)
+
+            // Channel 3: TTS service (low importance - just keeps service alive)
+            val ttsChannel = NotificationChannel(
+                CHANNEL_ID_TTS,
+                "EmisferIA TTS",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Servico de voz em segundo plano"
+                setShowBadge(false)
+                setSound(null, null)
+            }
+            notificationManager.createNotificationChannel(ttsChannel)
         }
     }
 }

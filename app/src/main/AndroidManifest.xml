@@ -7,9 +7,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- Features -->
     <uses-feature android:name="android.hardware.microphone" android:required="true" />
@@ -34,7 +36,9 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.EmisferiaProactive"
             android:screenOrientation="portrait"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -49,6 +53,12 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- TTS Foreground Service - speaks notifications without opening app -->
+        <service
+            android:name=".service.TtsForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- Wake Word Service - Old (SpeechRecognizer, disabled) -->
         <service
@@ -65,7 +75,7 @@
         <!-- FCM default notification channel -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="emisferia_proactive" />
+            android:value="emisferia_alerts_v2" />
 
         <!-- FCM default notification icon -->
         <meta-data
