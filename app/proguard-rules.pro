@@ -1,17 +1,25 @@
 # EmisferIA Proactive ProGuard Rules
 
-# Keep API models
+# Keep API models (all fields, constructors, generic signatures)
 -keep class com.emisferia.proactive.api.** { *; }
+-keepclassmembers class com.emisferia.proactive.api.** { *; }
 
 # Retrofit
 -keepattributes Signature
 -keepattributes Exceptions
 -keepattributes *Annotation*
+-keepattributes InnerClasses
+-keepattributes EnclosingMethod
 
 -keep class retrofit2.** { *; }
 -keepclasseswithmembers class * {
     @retrofit2.http.* <methods>;
 }
+
+# Retrofit + R8 + Coroutines (critical for suspend functions returning generics)
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
 
 # OkHttp
 -dontwarn okhttp3.**
@@ -19,7 +27,7 @@
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
 
-# Gson
+# Gson - preserve generic type information
 -keepattributes Signature
 -keepattributes *Annotation*
 -dontwarn sun.misc.**
@@ -28,6 +36,10 @@
 -keep class * implements com.google.gson.TypeAdapterFactory
 -keep class * implements com.google.gson.JsonSerializer
 -keep class * implements com.google.gson.JsonDeserializer
+
+# Gson TypeToken (critical - R8 strips generic signatures without this)
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
 
 # Coroutines
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
